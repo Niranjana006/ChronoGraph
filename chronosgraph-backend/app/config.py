@@ -9,9 +9,10 @@ class Settings(BaseSettings):
     jwt_secret: str
     
     # Optional / phase 2 variables mapped with default values or Optional
+    llm_provider: str = "groq"
     llm_api_key: str | None = None
-    llm_model: str | None = None
-    embedding_model: str | None = None
+    llm_model: str = "llama-3.1-8b-instant"
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
     auto_resolve_confidence_threshold: float = 0.85
     full_sweep_cron: str = "0 2 * * *"
 

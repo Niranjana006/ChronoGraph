@@ -21,6 +21,30 @@ services:
         condition: service_healthy
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
+  worker:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=supersecret_neo4j_password
+      - POSTGRES_DSN=postgresql+asyncpg://postgres:supersecret_postgres_password@postgres:5432/chronosgraph
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=supersecret_jwt_signature_key_please_change_me
+      - LLM_PROVIDER=groq
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=llama-3.1-8b-instant
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Cap concurrency at 1 to strictly prevent rate-limit bursts from concurrent LLM calls
+    command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=info", "--concurrency=1"]
+
   postgres:
     image: postgres:15-alpine
     environment:
