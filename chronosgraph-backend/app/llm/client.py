@@ -10,9 +10,6 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize Redis client for caching
-redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-
 # Configure base URL based on provider
 def get_base_url(provider: str) -> str | None:
     if provider.lower() == "groq":
@@ -21,11 +18,6 @@ def get_base_url(provider: str) -> str | None:
         return "http://host.docker.internal:11434/v1"
     # Fallback to default OpenAI URL
     return None
-
-llm_client = AsyncOpenAI(
-    api_key=settings.llm_api_key or "placeholder",
-    base_url=get_base_url(settings.llm_provider)
-)
 
 # 24 hour TTL (86400 seconds)
 CACHE_TTL = 86400
@@ -48,34 +40,41 @@ async def generate_completion(system_prompt: str, user_prompt: str, response_for
     prompt_hash = hash_prompt(system_prompt, user_prompt)
     cache_key = f"llm_cache:{prompt_hash}"
 
-    # 1. Check Cache
-    cached_result = await redis_client.get(cache_key)
-    if cached_result:
-        logger.info("Cache hit for LLM extraction.")
-        return cached_result
-
-    # 2. Throttle
-    # Prevent burst spikes by sleeping a small amount before the actual outgoing request
-    await asyncio.sleep(1.5)
-
-    # 3. Call LLM
-    logger.info(f"Calling LLM ({settings.llm_provider} - {settings.llm_model})")
-    kwargs = {
-        "model": settings.llm_model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "temperature": 0.0
-    }
+    async with Redis.from_url(settings.redis_url, decode_responses=True) as redis_client:
+        # 1. Check Cache
+        cached_result = await redis_client.get(cache_key)
+        if cached_result:
+            logger.info("Cache hit for LLM extraction.")
+            return cached_result
     
-    if response_format:
-        kwargs["response_format"] = response_format
-
-    response = await llm_client.chat.completions.create(**kwargs)
-    result = response.choices[0].message.content
-
-    # 4. Cache Result with TTL
-    await redis_client.set(cache_key, result, ex=CACHE_TTL)
+        # 2. Throttle
+        # Prevent burst spikes by sleeping a small amount before the actual outgoing request
+        await asyncio.sleep(1.5)
     
-    return result
+        # 3. Call LLM
+        logger.info(f"Calling LLM ({settings.llm_provider} - {settings.llm_model})")
+        
+        llm_client = AsyncOpenAI(
+            api_key=settings.llm_api_key or "placeholder",
+            base_url=get_base_url(settings.llm_provider)
+        )
+        
+        kwargs = {
+            "model": settings.llm_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.0
+        }
+        
+        if response_format:
+            kwargs["response_format"] = response_format
+    
+        response = await llm_client.chat.completions.create(**kwargs)
+        result = response.choices[0].message.content
+    
+        # 4. Cache Result with TTL
+        await redis_client.set(cache_key, result, ex=CACHE_TTL)
+        
+        return result

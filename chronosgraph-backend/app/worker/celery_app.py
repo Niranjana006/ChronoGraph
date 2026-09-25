@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 celery_app = Celery(
     "chronosgraph_worker",
     broker=settings.redis_url,
-    backend=settings.redis_url
+    backend=settings.redis_url,
+    include=["app.worker.tasks"]
 )
 
 celery_app.conf.update(

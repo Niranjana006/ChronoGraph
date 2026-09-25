@@ -53,8 +53,13 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
+from app.ingestion.router import router as ingestion_router
+from app.resolution.router import router as resolution_router
+
 app.include_router(auth_router)
 app.include_router(workspaces_router)
+app.include_router(ingestion_router)
+app.include_router(resolution_router)
 
 @app.get("/health")
 async def health_check():

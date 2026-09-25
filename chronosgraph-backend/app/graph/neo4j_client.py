@@ -15,6 +15,13 @@ class Neo4jClient:
     async def close(self):
         if self.driver:
             await self.driver.close()
+            
+    async def execute_write(self, query: str, parameters: dict = None):
+        if not self.driver:
+            await self.connect()
+        async with self.driver.session() as session:
+            result = await session.run(query, parameters or {})
+            return await result.data()
 
 neo4j_client = Neo4jClient()
 
