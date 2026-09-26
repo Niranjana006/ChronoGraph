@@ -17,111 +17,13 @@ import { promptSuggestions } from "@/lib/mock-data";
 import type { Chat, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+import { apiFetch } from "@/lib/api";
+import { adaptMessage } from "@/lib/adapters";
+
 function formatWindow(from: string, to: string | null) {
   return `${from} → ${to ?? "present"}`;
 }
 
-function buildAnswer(question: string): ChatMessage {
-  const q = question.toLowerCase();
-  if (q.includes("sick") || q.includes("leave")) {
-    return {
-      id: `m-${Date.now()}-a`,
-      role: "assistant",
-      createdAt: new Date().toISOString(),
-      content:
-        "Current best evidence: 15 paid sick days per calendar year, effective 1 January 2025 [1]. The prior entitlement of 10 days applied from 2022 until the end of 2024 [2]. A Q1 2025 addendum states a 12-day cap for a legacy cohort [3] and has not been reconciled.",
-      citations: [
-        {
-          index: 1,
-          documentId: "doc-handbook-2025",
-          documentName: "Employee_Handbook_2025.pdf",
-          snippet:
-            "Effective 1 January 2025, the annual paid sick leave entitlement increases to fifteen (15) days.",
-          validFrom: "2025-01-01",
-          validTo: null,
-          entityId: "ent-sick-leave",
-        },
-        {
-          index: 2,
-          documentId: "doc-handbook-2022",
-          documentName: "Employee_Handbook_2022.pdf",
-          snippet: "Full-time employees accrue ten (10) paid sick days per calendar year.",
-          validFrom: "2022-01-01",
-          validTo: "2024-12-31",
-          entityId: "ent-sick-leave",
-        },
-        {
-          index: 3,
-          documentId: "doc-benefits-addendum",
-          documentName: "Benefits_Addendum_Q1_2025.docx",
-          snippet:
-            "Sick leave remains capped at twelve (12) days for staff on the legacy benefits schedule.",
-          validFrom: "2025-01-01",
-          validTo: null,
-          entityId: "ent-sick-leave",
-        },
-      ],
-      conflictRefs: ["cf-1"],
-    };
-  }
-  if (q.includes("notice")) {
-    return {
-      id: `m-${Date.now()}-a`,
-      role: "assistant",
-      createdAt: new Date().toISOString(),
-      content:
-        "Current best evidence: the standard resignation notice period is 60 days from 1 July 2025 [1]. The earlier 30-day requirement applied from 2022 to 30 June 2025 [2]; that supersession was auto-resolved with high confidence.",
-      citations: [
-        {
-          index: 1,
-          documentId: "doc-handbook-2025",
-          documentName: "Employee_Handbook_2025.pdf",
-          snippet: "From 1 July 2025 the standard notice period is sixty (60) days.",
-          validFrom: "2025-07-01",
-          validTo: null,
-          entityId: "ent-notice-period",
-        },
-        {
-          index: 2,
-          documentId: "doc-handbook-2022",
-          documentName: "Employee_Handbook_2022.pdf",
-          snippet: "Employees shall give thirty (30) days written notice of resignation.",
-          validFrom: "2022-01-01",
-          validTo: "2025-06-30",
-          entityId: "ent-notice-period",
-        },
-      ],
-    };
-  }
-  return {
-    id: `m-${Date.now()}-a`,
-    role: "assistant",
-    createdAt: new Date().toISOString(),
-    content:
-      "Current best evidence from this workspace's graph: renewal terms for the Acme MSA are 24 months following Amendment 2 (15 January 2026) [1], amending the original 12-month term [2]. The amendment does not state how in-flight renewals are treated, so this remains open for review.",
-    citations: [
-      {
-        index: 1,
-        documentId: "doc-acme-amend-2",
-        documentName: "Acme_Amendment_2_2026.pdf",
-        snippet: "Section 4.2 is amended so that renewal terms shall be twenty-four (24) months.",
-        validFrom: "2026-01-15",
-        validTo: null,
-        entityId: "ent-renewal-term",
-      },
-      {
-        index: 2,
-        documentId: "doc-acme-msa",
-        documentName: "Acme_MSA_2023.pdf",
-        snippet: "This Agreement renews automatically for successive twelve (12) month terms.",
-        validFrom: "2023-04-01",
-        validTo: null,
-        entityId: "ent-renewal-term",
-      },
-    ],
-    conflictRefs: ["cf-4"],
-  };
-}
 
 export function ChatView({ workspaceId, chat }: { workspaceId: string; chat: Chat | null }) {
   const { appendMessages, createChat, conflicts } = useApp();
@@ -142,12 +44,12 @@ export function ChatView({ workspaceId, chat }: { workspaceId: string; chat: Cha
     inputRef.current?.focus();
   }, [chat?.id]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const content = text.trim();
     if (!content) return;
     let targetId = chat?.id;
     if (!targetId) {
-      const created = createChat(workspaceId);
+      const created = await createChat(workspaceId);
       targetId = created.id;
       navigate({
         to: "/workspace/$workspaceId/chat/$chatId",
@@ -163,12 +65,19 @@ export function ChatView({ workspaceId, chat }: { workspaceId: string; chat: Cha
     appendMessages(targetId, [userMsg]);
     setDraft("");
     setPending(true);
-    const id = targetId;
-    window.setTimeout(() => {
-      appendMessages(id, [buildAnswer(content)]);
+    
+    try {
+      const res = await apiFetch(`/workspaces/${workspaceId}/chats/${targetId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      });
+      appendMessages(targetId, [adaptMessage(res)]);
+    } catch (err) {
+      console.error("Failed to send message", err);
+    } finally {
       setPending(false);
       inputRef.current?.focus();
-    }, 900);
+    }
   };
 
   return (
@@ -276,29 +185,24 @@ function AnswerCard({
   conflictTitles: ReturnType<typeof useApp>["conflicts"];
 }) {
   const [open, setOpen] = useState(false);
-  const refs = (message.conflictRefs ?? []).filter((id) => {
-    const c = conflictTitles.find((x) => x.id === id);
-    return Boolean(c);
-  });
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
 
-      {refs.map((id) => {
-        const conflict = conflictTitles.find((c) => c.id === id)!;
+      {message.conflicts && message.conflicts.map((conflict, i) => {
         return (
           <div
-            key={id}
+            key={i}
             className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning-surface px-3 py-2 text-xs text-warning-foreground"
           >
             <TriangleAlert className="size-4 shrink-0" />
             <span className="font-medium">
-              Conflicting information exists for this fact ({conflict.entityName})
+              Conflicting information exists for this fact ({conflict.status})
             </span>
             <Link
-              to="/workspace/$workspaceId/conflicts/$conflictId"
-              params={{ workspaceId, conflictId: id }}
+              to="/workspace/$workspaceId/conflicts"
+              params={{ workspaceId }}
               className="ml-auto font-semibold underline underline-offset-2"
             >
               View details
@@ -318,19 +222,19 @@ function AnswerCard({
           </button>
           {open && (
             <ul className="mt-3 space-y-2">
-              {message.citations.map((c) => (
-                <li key={c.index} className="rounded-lg border border-border bg-background p-3">
+              {message.citations.map((c: any, i: number) => (
+                <li key={c.index || i} className="rounded-lg border border-border bg-background p-3">
                   <div className="flex items-center gap-2 text-xs font-medium">
                     <span className="flex size-5 items-center justify-center rounded bg-accent text-[10px]">
-                      {c.index}
+                      {c.index || (i + 1)}
                     </span>
                     <FileText className="size-3.5 text-muted-foreground" />
-                    {c.documentName}
+                    {c.documentName || c.document_name}
                   </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">“{c.snippet}”</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">“{c.snippet || c.evidence}”</p>
                   <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <Clock className="size-3" /> {formatWindow(c.validFrom, c.validTo)}
+                      <Clock className="size-3" /> {formatWindow(c.validFrom || c.valid_from || "Unknown", c.validTo || c.valid_to || null)}
                     </span>
                     {c.entityId && (
                       <Link

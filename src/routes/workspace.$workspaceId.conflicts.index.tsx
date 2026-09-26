@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, CircleCheck, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useApp } from "@/lib/app-state";
-import { entities } from "@/lib/mock-data";
-import type { Conflict, Fact } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
+import { adaptConflict } from "@/lib/adapters";
+import type { Conflict } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/workspace/$workspaceId/conflicts/")({
@@ -26,15 +28,16 @@ export const Route = createFileRoute("/workspace/$workspaceId/conflicts/")({
   component: ConflictQueue,
 });
 
-export function findFact(id: string): Fact | undefined {
-  for (const e of entities) {
-    const f = e.facts.find((x) => x.id === id);
-    if (f) return f;
-  }
-  return undefined;
+interface FactInfo {
+  id: string;
+  value: string;
+  snippet: string;
+  documentName: string;
+  validFrom: string;
+  validTo: string | null;
 }
 
-function FactPane({ fact, tone }: { fact: Fact | undefined; tone: "current" | "other" }) {
+function FactPane({ fact, tone }: { fact: FactInfo | undefined; tone: "current" | "other" }) {
   if (!fact) return null;
   return (
     <div
@@ -65,16 +68,41 @@ function FactPane({ fact, tone }: { fact: Fact | undefined; tone: "current" | "o
 
 function ConflictQueue() {
   const { workspaceId } = Route.useParams();
-  const { conflicts, setConflictStatus, user, role } = useApp();
-  const list = conflicts.filter((c) => c.workspaceId === workspaceId);
+  const { user, role } = useApp();
+  const [list, setList] = useState<Conflict[]>([]);
+
+  const fetchConflicts = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/workspaces/${workspaceId}/conflicts`);
+      setList(res.map(adaptConflict));
+    } catch (err) {
+      console.error("Failed to fetch conflicts", err);
+    }
+  }, [workspaceId]);
+
+  useEffect(() => {
+    fetchConflicts();
+  }, [fetchConflicts]);
 
   if (role === "analyst") {
     return <NoAccess />;
   }
 
-  const act = (c: Conflict, status: Conflict["status"], label: string) => {
-    setConflictStatus(c.id, status, user?.name ?? "unknown");
-    toast.success(`${label} — ${c.entityName}`);
+  const act = async (c: Conflict, status: Conflict["status"], label: string) => {
+    try {
+      await apiFetch(`/workspaces/${workspaceId}/conflicts/${c.id}/resolve`, {
+        method: "POST",
+        body: JSON.stringify({
+          status,
+          resolved_by: user?.name ?? "unknown",
+        }),
+      });
+      toast.success(`${label} — ${c.entityName}`);
+      await fetchConflicts();
+    } catch (err) {
+      console.error("Failed to resolve conflict", err);
+      toast.error("Failed to update conflict status");
+    }
   };
 
   return (
@@ -94,9 +122,24 @@ function ConflictQueue() {
         )}
 
         {list.map((c) => {
-          const a = findFact(c.factAId);
-          const b = findFact(c.factBId);
-          const needs = c.status === "needs_review" || c.status === "escalated";
+          const a: FactInfo = {
+            id: c.factAId,
+            value: `${c.entityName} ${c.factADocumentName ? "->" : ""} ...`, // backend payload lacks full relation string, simplify for now
+            snippet: c.factAEvidence || "No evidence available",
+            documentName: c.factADocumentName || "Unknown",
+            validFrom: c.factAValidFrom || "unknown",
+            validTo: c.factAValidTo || null,
+          };
+          const b: FactInfo = {
+            id: c.factBId,
+            value: `${c.entityName} ${c.factBDocumentName ? "->" : ""} ...`,
+            snippet: c.factBEvidence || "No evidence available",
+            documentName: c.factBDocumentName || "Unknown",
+            validFrom: c.factBValidFrom || "unknown",
+            validTo: c.factBValidTo || null,
+          };
+          
+          const needs = c.status === "needs_review" || c.status === "escalated" || c.status === "pending_review";
           return (
             <article key={c.id} className="rounded-xl border border-border bg-card p-5">
               <div className="flex flex-wrap items-center gap-2">

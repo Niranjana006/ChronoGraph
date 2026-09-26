@@ -25,13 +25,13 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@") || password.length < 4) {
       setError("Those credentials didn't match an account. Check your email and password.");
       return;
     }
-    const res = login(email);
+    const res = await login(email, password);
     if (!res.ok) {
       setError(res.error ?? "Unable to sign in.");
       return;

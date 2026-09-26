@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import * as mock from "./mock-data";
+import { apiFetch, setToken, clearToken } from "./api";
 import type { Chat, ChatMessage, Conflict, Role, User, Workspace } from "./types";
 
 const STORAGE_KEY = "chronosgraph.session.v1";
@@ -21,8 +22,8 @@ interface AppState {
   hydrated: boolean;
   user: User | null;
   role: Role;
-  login: (email: string) => { ok: boolean; error?: string };
-  signup: (name: string, email: string) => void;
+  login: (email: string, password?: string) => Promise<{ ok: boolean; error?: string }>;
+  signup: (name: string, email: string, password?: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   setRole: (role: Role) => void;
   updateUser: (patch: Partial<User>) => void;
@@ -32,7 +33,7 @@ interface AppState {
   createWorkspace: (name: string) => Workspace;
   archiveWorkspace: (id: string) => void;
   chats: Chat[];
-  createChat: (workspaceId: string) => Chat;
+  createChat: (workspaceId: string) => Promise<Chat>;
   renameChat: (id: string, title: string) => void;
   deleteChat: (id: string) => void;
   archiveChat: (id: string) => void;
@@ -74,35 +75,58 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login: AppState["login"] = useCallback(
-    (email) => {
-      const found =
-        mock.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase()) ?? null;
-      const account = found ?? (mock.users[0] as User);
-      if (!found && !email.includes("@")) return { ok: false, error: "Enter a valid email address." };
-      setUser(account);
-      persist({ user: account, lastWorkspaceId });
-      return { ok: true };
+    async (email, password = "") => {
+      try {
+        const formData = new URLSearchParams();
+        formData.append("username", email);
+        formData.append("password", password);
+        
+        const res = await apiFetch("/auth/login", {
+          method: "POST",
+          body: formData,
+        });
+        
+        setToken(res.access_token);
+        
+        // Mock user details since /auth/login only returns token for now
+        const account: User = {
+          id: `u-${Date.now()}`,
+          name: email.split("@")[0],
+          email,
+          role: "analyst",
+          workspaceIds: [],
+          createdAt: new Date().toISOString(),
+        };
+        setUser(account);
+        persist({ user: account, lastWorkspaceId });
+        return { ok: true };
+      } catch (err: any) {
+        return { ok: false, error: err.message || "Failed to log in" };
+      }
     },
     [lastWorkspaceId, persist],
   );
 
   const signup: AppState["signup"] = useCallback(
-    (name, email) => {
-      const account: User = {
-        id: `u-${Date.now()}`,
-        name,
-        email,
-        role: "pending",
-        workspaceIds: [],
-        createdAt: new Date().toISOString(),
-      };
-      setUser(account);
-      persist({ user: account, lastWorkspaceId: null });
+    async (name, email, password = "") => {
+      try {
+        const res = await apiFetch("/auth/signup", {
+          method: "POST",
+          body: JSON.stringify({ name, email, password }),
+        });
+        
+        // Auto login after signup
+        const loginRes = await login(email, password);
+        return loginRes;
+      } catch (err: any) {
+        return { ok: false, error: err.message || "Failed to sign up" };
+      }
     },
-    [persist],
+    [login],
   );
 
   const logout = useCallback(() => {
+    clearToken();
     setUser(null);
     persist({ user: null, lastWorkspaceId: null });
   }, [persist]);
@@ -160,16 +184,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setWorkspaces((prev) => prev.map((w) => (w.id === id ? { ...w, archived: !w.archived } : w)));
   }, []);
 
-  const createChat = useCallback((workspaceId: string) => {
-    const chat: Chat = {
-      id: `chat-${Date.now()}`,
-      workspaceId,
-      title: "New chat",
-      updatedAt: new Date().toISOString(),
-      messages: [],
-    };
-    setChats((prev) => [chat, ...prev]);
-    return chat;
+  const createChat = useCallback(async (workspaceId: string) => {
+    try {
+      const res = await apiFetch(`/workspaces/${workspaceId}/chats`, { method: "POST" });
+      const chat: Chat = {
+        id: String(res.id),
+        workspaceId,
+        title: "New chat",
+        updatedAt: new Date().toISOString(),
+        messages: [],
+      };
+      setChats((prev) => [chat, ...prev]);
+      return chat;
+    } catch (err) {
+      console.error("Failed to create chat", err);
+      throw err;
+    }
   }, []);
 
   const renameChat = useCallback((id: string, title: string) => {

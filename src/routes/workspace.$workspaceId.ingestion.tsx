@@ -3,7 +3,8 @@ import { ArrowRight, FileUp, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NoAccess } from "./workspace.$workspaceId.conflicts.index";
 import { useApp } from "@/lib/app-state";
-import { documents as seedDocs } from "@/lib/mock-data";
+import { apiFetch } from "@/lib/api";
+import { adaptDocument } from "@/lib/adapters";
 import type { DocStatus, IngestedDocument } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -47,54 +48,55 @@ function statusClass(s: DocStatus) {
 function IngestionPage() {
   const { workspaceId } = Route.useParams();
   const { role, conflicts } = useApp();
-  const [docs, setDocs] = useState<IngestedDocument[]>(() =>
-    seedDocs.filter((d) => d.workspaceId === workspaceId),
-  );
+  const [docs, setDocs] = useState<IngestedDocument[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const fetchDocs = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/workspaces/${workspaceId}/documents`);
+      setDocs(res.map(adaptDocument));
+    } catch (err) {
+      console.error("Failed to fetch documents", err);
+    }
+  }, [workspaceId]);
+
   useEffect(() => {
-    const t = window.setInterval(() => {
-      setDocs((prev) =>
-        prev.map((d) => {
-          if (d.status === "complete" || d.status === "failed") return d;
-          const i = STAGES.indexOf(d.status);
-          const next = STAGES[Math.min(i + 1, STAGES.length - 1)]!;
-          return {
-            ...d,
-            status: next,
-            auditedNodes: next === "auditing" ? d.auditedNodes + 7 : d.auditedNodes,
-            newFacts: next === "extracting" ? d.newFacts + 2 : d.newFacts,
-          };
-        }),
-      );
-    }, 3500);
+    fetchDocs();
+    const t = window.setInterval(fetchDocs, 3500); // poll every 3.5s
     return () => window.clearInterval(t);
-  }, []);
+  }, [fetchDocs]);
 
   const addFiles = useCallback(
-    (files: FileList | null) => {
-      if (!files) return;
-      const added: IngestedDocument[] = Array.from(files).map((f, i) => ({
-        id: `d-${Date.now()}-${i}`,
-        workspaceId,
-        filename: f.name,
-        kind: f.name.endsWith(".pdf")
-          ? "pdf"
-          : f.name.endsWith(".docx")
-            ? "docx"
-            : f.name.endsWith(".xlsx")
-              ? "xlsx"
-              : "image",
-        status: "queued",
-        uploadedAt: new Date().toISOString(),
-        newFacts: 0,
-        updatedFacts: 0,
-        auditedNodes: 0,
-      }));
-      setDocs((prev) => [...added, ...prev]);
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      
+      setUploading(true);
+      try {
+        for (const file of Array.from(files)) {
+          if (!file.name.toLowerCase().endsWith(".pdf")) {
+            alert(`Only PDF files are supported currently. Skipping ${file.name}`);
+            continue;
+          }
+          
+          const formData = new FormData();
+          formData.append("file", file);
+          
+          await apiFetch(`/workspaces/${workspaceId}/documents`, {
+            method: "POST",
+            body: formData, // fetch will automatically set multipart/form-data boundary
+          });
+        }
+        await fetchDocs();
+      } catch (err) {
+        console.error("Upload failed", err);
+        alert("Upload failed. Check console for details.");
+      } finally {
+        setUploading(false);
+      }
     },
-    [workspaceId],
+    [workspaceId, fetchDocs],
   );
 
   if (role === "analyst") return <NoAccess />;
@@ -140,8 +142,10 @@ function IngestionPage() {
         )}
       >
         <FileUp className="mx-auto size-6 text-muted-foreground" />
-        <p className="mt-3 text-sm font-medium">Drop documents here or click to browse</p>
-        <p className="mt-1 text-xs text-muted-foreground">PDF, DOCX, XLSX and scanned images</p>
+        <p className="mt-3 text-sm font-medium">
+          {uploading ? "Uploading..." : "Drop documents here or click to browse"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">PDF files only (MVP)</p>
         <input
           ref={inputRef}
           type="file"
@@ -179,9 +183,11 @@ function IngestionPage() {
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {d.status === "failed"
                     ? "No changes applied"
-                    : d.status === "queued"
-                      ? "Waiting for a worker"
-                      : `Found ${d.newFacts} new facts, ${d.updatedFacts} updated facts, auditing ${d.auditedNodes} affected nodes for conflicts`}
+                    : d.status === "completed"
+                      ? "Graph updated successfully"
+                      : d.current_stage
+                        ? STATUS_LABEL[d.current_stage as DocStatus] || d.current_stage
+                        : "Waiting for a worker"}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {new Date(d.uploadedAt).toLocaleString()}

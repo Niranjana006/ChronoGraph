@@ -27,7 +27,7 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   citations?: Citation[];
-  conflictRefs?: string[]; // conflict ids surfaced in this answer
+  conflicts?: { status: string; explanation: string }[];
 }
 
 export interface Chat {
@@ -62,12 +62,10 @@ export interface IngestedDocument {
   id: string;
   workspaceId: string;
   filename: string;
-  kind: "pdf" | "docx" | "xlsx" | "image";
-  status: DocStatus;
+  kind?: string;
+  status: string;
+  current_stage?: string;
   uploadedAt: string;
-  newFacts: number;
-  updatedFacts: number;
-  auditedNodes: number;
   errorReason?: string;
 }
 
@@ -96,15 +94,25 @@ export interface Entity {
 export interface Conflict {
   id: string;
   workspaceId: string;
-  entityId: string;
+  entityId?: string;
   entityName: string;
   factAId: string;
   factBId: string;
   detectedAt: string;
   suggestion: string;
   confidence: number; // 0..1
-  status: "auto_resolved" | "needs_review" | "escalated" | "accepted" | "overridden";
+  status: "auto_resolved" | "needs_review" | "pending_review" | "escalated" | "accepted" | "overridden";
   resolvedBy?: string;
+
+  // Enriched fields from backend
+  factAEvidence?: string;
+  factBEvidence?: string;
+  factAValidFrom?: string;
+  factBValidFrom?: string;
+  factAValidTo?: string;
+  factBValidTo?: string;
+  factADocumentName?: string;
+  factBDocumentName?: string;
 }
 
 export interface AuditEntry {

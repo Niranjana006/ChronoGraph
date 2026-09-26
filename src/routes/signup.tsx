@@ -33,13 +33,17 @@ function SignupPage() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return setError("Please enter your full name.");
     if (!form.email.includes("@")) return setError("Enter a valid work email address.");
     if (form.password.length < 8) return setError("Password must be at least 8 characters.");
     if (form.password !== form.confirm) return setError("Passwords don't match.");
-    signup(form.name.trim(), form.email.trim());
+    
+    const res = await signup(form.name.trim(), form.email.trim(), form.password);
+    if (!res.ok) {
+      return setError(res.error ?? "Failed to sign up.");
+    }
     navigate({ to: "/" });
   };
 
