@@ -8,12 +8,13 @@ from app.llm.client import generate_completion
 logger = logging.getLogger(__name__)
 
 class TemporalResolution(BaseModel):
+    fact_id: str = Field(description="The original fact_id from the input.")
     parsed_valid_from: str | None = Field(description="ISO-8601 date string (e.g. 1961-01-01), or null if unable to resolve.")
     parsed_valid_to: str | None = Field(description="ISO-8601 date string (e.g. 1963-12-31), or null if unable to resolve.")
-    temporal_confidence: str = Field(description="Must be 'high' if you confidently resolved a date, or 'low' if the text is ambiguous (e.g. 'recently') or has no date context.")
+    temporal_confidence: str = Field(description="Must be 'high' if you confidently resolved a date, or 'low' if the text is ambiguous.")
 
 class TemporalNormalizationResponse(BaseModel):
-    results: Dict[str, TemporalResolution] = Field(description="A dictionary mapping the Fact ID to its TemporalResolution.")
+    results: list[TemporalResolution] = Field(description="A list of normalized temporal resolutions.")
 
 async def resolve_temporal(workspace_id: int):
     """
@@ -26,7 +27,7 @@ async def resolve_temporal(workspace_id: int):
     query_fetch = """
     MATCH (f:Fact {workspace_id: $workspace_id})-[:SOURCED_FROM]->(d:Document)
     WHERE f.parsed_valid_from IS NULL AND f.temporal_confidence IS NULL
-    RETURN elementId(f) AS fact_id, f.valid_from AS valid_from, f.valid_to AS valid_to, f.evidence AS evidence
+    RETURN f.id AS fact_id, f.valid_from AS valid_from, f.valid_to AS valid_to, f.evidence AS evidence
     """
     
     records = await neo4j_client.execute_write(query_fetch, {"workspace_id": workspace_id})
@@ -45,7 +46,8 @@ async def resolve_temporal(workspace_id: int):
         batch = records[i:i+batch_size]
         
         prompt_data = {
-            "instructions": "You are a temporal normalization engine. Convert relative or fuzzy temporal phrases into concrete ISO-8601 dates (YYYY-MM-DD). If a fact says '1961', the valid_from is 1961-01-01 and valid_to is 1961-12-31. If the fact is ambiguous (like 'recently', 'later', 'during the war') and you cannot confidently provide a date, set temporal_confidence to 'low' and leave the dates null. DO NOT GUESS DATES.",
+            "instructions": "You are a temporal normalization engine. Convert relative or fuzzy temporal phrases into concrete ISO-8601 dates (YYYY-MM-DD). If a fact says someone 'became CEO in 2020' or started something in 2020, set valid_from to '2020-01-01' and leave valid_to as null (meaning ongoing). If they 'were CEO from 2020 to 2022', set valid_from='2020-01-01', valid_to='2022-12-31'. If the fact is ambiguous (like 'recently', 'later') and you cannot confidently provide a date, set temporal_confidence to 'low' and leave the dates null. DO NOT GUESS DATES.",
+            "expected_output_schema": TemporalNormalizationResponse.model_json_schema(),
             "facts_to_normalize": batch
         }
         
@@ -61,13 +63,13 @@ async def resolve_temporal(workspace_id: int):
             response = TemporalNormalizationResponse(**parsed_json)
             
             # 2. Update the graph with the parsed dates
-            for fact_id, resolution in response.results.items():
+            for resolution in response.results:
                 update_query = """
-                MATCH (f:Fact) WHERE elementId(f) = $fact_id
+                MATCH (f:Fact {id: $fact_id})
                 SET f.temporal_confidence = $confidence
                 """
                 params = {
-                    "fact_id": fact_id,
+                    "fact_id": resolution.fact_id,
                     "confidence": resolution.temporal_confidence
                 }
                 

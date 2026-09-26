@@ -57,6 +57,9 @@ async def run_pipeline(document_id: int, workspace_id: int, file_path: str):
             document.status = "completed"
             await db.commit()
             logger.info(f"Successfully processed document {document_id}")
+            
+            # Auto-chain resolution and then audit
+            resolve_workspace_task.delay(workspace_id)
     finally:
         from app.graph.neo4j_client import neo4j_client
         await neo4j_client.close()
@@ -97,6 +100,8 @@ def resolve_workspace_task(self, workspace_id: int):
         async def _run_resolution():
             from app.graph.neo4j_client import neo4j_client
             await engine.dispose()
+            if neo4j_client.driver is None:
+                await neo4j_client.connect()
             try:
                 m = await resolve_entities(workspace_id)
                 t = await resolve_temporal(workspace_id)
@@ -107,6 +112,9 @@ def resolve_workspace_task(self, workspace_id: int):
             
         merged_pairs, temporal_processed = asyncio.run(_run_resolution())
         
+        # Auto-chain Consistency Swarm audit
+        audit_workspace_task.delay(workspace_id)
+        
         return {
             "workspace_id": workspace_id,
             "merged_pairs": len(merged_pairs),
@@ -114,4 +122,39 @@ def resolve_workspace_task(self, workspace_id: int):
         }
     except Exception as exc:
         logger.error(f"Error in resolve_workspace_task: {exc}")
+        raise self.retry(exc=exc, countdown=10)
+
+@celery_app.task(bind=True, max_retries=3, name="app.worker.tasks.audit_workspace_task")
+def audit_workspace_task(self, workspace_id: int):
+    """
+    Celery task to run the Consistency Swarm (Conflict Detection).
+    """
+    import asyncio
+    from app.conflicts.auditor import audit_workspace
+    
+    logger.info(f"Task audit_workspace_task received for workspace {workspace_id}")
+    try:
+        async def _run_audit():
+            from app.graph.neo4j_client import neo4j_client
+            await engine.dispose()
+            if neo4j_client.driver is None:
+                await neo4j_client.connect()
+            try:
+                c = await audit_workspace(workspace_id)
+                return c
+            finally:
+                await neo4j_client.close()
+                neo4j_client.driver = None
+            
+        conflicts = asyncio.run(_run_audit())
+        
+        return {
+            "workspace_id": workspace_id,
+            "conflicts_found": conflicts
+        }
+    except RateLimitError as exc:
+        logger.warning("Rate limit completely exhausted. Requeuing task in 60s.")
+        raise self.retry(exc=exc, countdown=60)
+    except Exception as exc:
+        logger.error(f"Error in audit_workspace_task: {exc}")
         raise self.retry(exc=exc, countdown=10)

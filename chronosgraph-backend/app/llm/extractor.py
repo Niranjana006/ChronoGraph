@@ -42,7 +42,7 @@ Schema Requirement:
     {
       "source": "e1",
       "target": "e2",
-      "relation": "RELATION_NAME",
+      "relation": "CEO_OF", // Choose from: CEO_OF, EMPLOYEE_OF, FOUNDED_BY, ACQUIRED, HEADQUARTERED_IN, LOCATED_IN, BORN_IN, HAS_ROLE, PARTNER_OF. Fallback to UPPERCASE_SNAKE_CASE if none fit perfectly.
       "valid_from": "YYYY-MM-DD or context",
       "valid_to": "YYYY-MM-DD or context",
       "evidence": "Exact quote from text"

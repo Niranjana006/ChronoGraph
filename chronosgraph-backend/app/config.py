@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_model: str = "llama3-8b-8192"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
-    auto_resolve_confidence_threshold: float = 0.85
+    auto_resolve_confidence_threshold: float = 0.90
+    conflict_auto_resolve_threshold: float = 0.85
     full_sweep_cron: str = "0 2 * * *"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

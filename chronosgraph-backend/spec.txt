@@ -1,0 +1,81 @@
+<USER_REQUEST>
+PS E:\ChronoGraph\conflict-cognition\chronosgraph-backend> docker-compose up -d --build
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.09kB done
+#1 DONE 0.0s
+
+#2 [api internal] load build definition from Dockerfile
+#2 transferring dockerfile: 658B 0.0s done
+#2 DONE 0.0s
+
+#3 [api internal] load metadata for docker.io/library/python:3.11-slim
+#3 ...
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 [api internal] load metadata for docker.io/library/python:3.11-slim
+#3 DONE 1.7s
+
+#5 [worker internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [api 1/6] FROM docker.io/library/python:3.11-slim@sha256:da047cb8f9d1d98e5c070f5300ba9f7274e33b8fc0e5be5ed88740aed1b95ba9
+#6 resolve docker.io/library/python:3.11-slim@sha256:da047cb8f9d1d98e5c070f5300ba9f7274e33b8fc0e5be5ed88740aed1b95ba9 0.0s done
+#6 DONE 0.0s
+
+#7 [worker internal] load build context
+#7 transferring context: 409B done
+#7 DONE 0.0s
+
+#8 [api 2/6] WORKDIR /app
+#8 CACHED
+
+#9 [api 3/6] RUN apt-get update && apt-get install -y     build-essential     libpq-dev     && rm -rf /var/lib/apt/lists/*
+#9 CACHED
+
+#10 [api 4/6] COPY requirements.txt .
+#10 DONE 0.1s
+
+#10 [worker 4/6] COPY requirements.txt .
+#10 DONE 0.1s
+
+#11 [worker 5/6] RUN pip install --no-cache-dir torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+#11 3.179 Looking in indexes: https://download.pytorch.org/whl/cpu
+#11 3.670 Collecting torch==2.2.2
+#11 3.832   Downloading https://download-r2.pytorch.org/whl/cpu/torch-2.2.2%2Bcpu-cp311-cp311-linux_x86_64.whl (186.8 MB)
+#11 97.12      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 186.8/186.8 MB 4.5 MB/s eta 0:00:00
+#11 97.58 Collecting filelock (from torch==2.2.2)
+#11 97.69   Downloading filelock-3.32.3-py3-none-any.whl.metadata (2.0 kB)
+#11 97.76 Collecting typing-extensions>=4.8.0 (from torch==2.2.2)
+#11 97.77   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+#11
+<truncated 45212 bytes>
+lution_tester@test.com", "password": "password"})
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_client.py", line 1144, in post
+    return self.request(
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_client.py", line 914, in send
+    response = self._send_handling_auth(
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_transports\default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "C:\Users\Niranjana\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: [WinError 10061] No connection could be made because the target machine actively refused it
+PS E:\ChronoGraph\conflict-cognition\chronosgraph-backend> 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09
+<truncated 42 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.

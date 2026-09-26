@@ -35,7 +35,7 @@ async def write_extraction_to_graph(
     entity_query = """
     UNWIND $entities AS ent
     MERGE (e:Entity {id: ent.name, workspace_id: $workspace_id})
-    ON CREATE SET e.type = ent.type
+    ON CREATE SET e.type = ent.type, e.name = ent.name
     """
     # Create a mapping from the LLM's local ID (e.g. "e1") to the global name for linking facts later
     local_id_to_name = {ent.id: ent.name for ent in extraction.entities}
