@@ -6,10 +6,15 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize the embedding model. This will download on first run and use the cached HuggingFace volume thereafter.
-logger.info("Loading sentence-transformers model...")
-embedder = SentenceTransformer(settings.embedding_model)
-logger.info("Embedding model loaded.")
+embedder = None
+
+def get_embedder():
+    global embedder
+    if embedder is None:
+        logger.info("Loading sentence-transformers model...")
+        embedder = SentenceTransformer(settings.embedding_model)
+        logger.info("Embedding model loaded.")
+    return embedder
 
 async def resolve_entities(workspace_id: int):
     """
@@ -33,7 +38,8 @@ async def resolve_entities(workspace_id: int):
     
     # 2. Generate embeddings
     logger.info(f"Generating embeddings for {len(entities)} entities...")
-    embeddings = embedder.encode(entities)
+    emb = get_embedder()
+    embeddings = emb.encode(entities)
     
     # 3. Calculate similarity matrix
     similarity_matrix = cosine_similarity(embeddings)
