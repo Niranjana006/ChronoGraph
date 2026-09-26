@@ -10,4 +10,5 @@ class Document(Base):
     filename = Column(String, nullable=False)
     content_hash = Column(String, nullable=False, index=True)
     status = Column(String, nullable=False, default="processing")
+    current_stage = Column(String, nullable=False, default="queued")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

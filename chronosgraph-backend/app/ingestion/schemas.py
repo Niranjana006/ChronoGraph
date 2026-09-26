@@ -7,6 +7,7 @@ class DocumentResponse(BaseModel):
     filename: str
     content_hash: str
     status: str
+    current_stage: str
     created_at: datetime
 
     class Config:

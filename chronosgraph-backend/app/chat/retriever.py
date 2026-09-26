@@ -88,6 +88,7 @@ async def retrieve_context(workspace_id: int, query: str):
     // Get the other entity involved in this fact
     MATCH (f)-[r2]-(e2:Entity)
     WHERE e2.id <> e.id
+    OPTIONAL MATCH (f)-[:SOURCED_FROM]->(d:Document)
     OPTIONAL MATCH (f)-[c:CONTRADICTS]-(f2:Fact {workspace_id: $workspace_id})
     RETURN e.id AS matched_entity, 
            type(r) AS relation_to_fact,
@@ -98,6 +99,7 @@ async def retrieve_context(workspace_id: int, query: str):
            f.evidence AS evidence,
            e2.id AS other_entity,
            type(r2) AS other_relation,
+           d.filename AS document_name,
            c.status AS conflict_status,
            c.explanation AS conflict_explanation,
            f2.id AS conflicting_fact_id,

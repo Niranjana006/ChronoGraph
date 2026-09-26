@@ -20,6 +20,10 @@ You MUST cite your sources. Return a structured JSON object containing:
 - "citations": An array of citation objects, each containing:
   - "fact_id": The ID of the fact cited.
   - "evidence": The exact string evidence from the document.
+  - "document_name": The name of the source document.
+  - "valid_from": The valid from date string if it exists in context, else null.
+  - "valid_to": The valid to date string if it exists in context, else null.
+  - "entity_name": The name of the core subject entity involved in this fact.
 - "conflicts": An array of conflict objects if any were present in the context, each containing:
   - "status": The status of the conflict.
   - "explanation": The system's explanation of the conflict.
@@ -55,6 +59,7 @@ def format_context(retrieved_data: list[dict]) -> str:
         if record["valid_to"]:
             fact_str += f" (Valid To: {record['valid_to']})"
             
+        fact_str += f"\nSource Document: {record.get('document_name', 'Unknown')}"
         fact_str += f"\nEvidence: \"{record['evidence']}\""
         
         # Add conflict info if present

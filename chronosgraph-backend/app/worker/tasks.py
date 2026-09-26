@@ -31,6 +31,8 @@ async def run_pipeline(document_id: int, workspace_id: int, file_path: str):
                 return
     
             # 2. Parse PDF
+            document.current_stage = "parsing"
+            await db.commit()
             try:
                 raw_text = extract_text_from_pdf(file_path)
                 chunks = chunk_text(raw_text)
@@ -42,6 +44,8 @@ async def run_pipeline(document_id: int, workspace_id: int, file_path: str):
                 return
     
             # 3. Extract and Write Graph per chunk
+            document.current_stage = "extracting"
+            await db.commit()
             for chunk in chunks:
                 try:
                     extraction = await extract_graph_from_chunk(chunk)
@@ -53,13 +57,13 @@ async def run_pipeline(document_id: int, workspace_id: int, file_path: str):
                     # Other errors shouldn't crash the whole pipeline, log and continue
                     logger.error(f"Failed to process chunk: {e}")
     
-            # 4. Mark complete
-            document.status = "completed"
+            # 4. Finish extraction step, do NOT mark complete yet
+            document.current_stage = "resolving_entities"
             await db.commit()
-            logger.info(f"Successfully processed document {document_id}")
+            logger.info(f"Successfully extracted document {document_id}")
             
-            # Auto-chain resolution and then audit
-            resolve_workspace_task.delay(workspace_id)
+            # Auto-chain resolution and then audit, passing document_id
+            resolve_workspace_task.delay(workspace_id, document_id)
     finally:
         from app.graph.neo4j_client import neo4j_client
         await neo4j_client.close()
@@ -85,7 +89,7 @@ def process_document(self, document_id: int, workspace_id: int, file_path: str):
         # Could mark as failed here by re-running async db update if needed
 
 @celery_app.task(bind=True, max_retries=3, name="app.worker.tasks.resolve_workspace_task")
-def resolve_workspace_task(self, workspace_id: int):
+def resolve_workspace_task(self, workspace_id: int, document_id: int = None):
     """
     Celery task to run entity resolution and temporal normalization 
     on all facts and entities in a workspace.
@@ -112,8 +116,17 @@ def resolve_workspace_task(self, workspace_id: int):
             
         merged_pairs, temporal_processed = asyncio.run(_run_resolution())
         
+        if document_id:
+            async def _update_doc_stage():
+                async with AsyncSessionLocal() as db:
+                    await db.execute(
+                        Document.__table__.update().where(Document.id == document_id).values(current_stage="auditing_conflicts")
+                    )
+                    await db.commit()
+            asyncio.run(_update_doc_stage())
+            
         # Auto-chain Consistency Swarm audit
-        audit_workspace_task.delay(workspace_id)
+        audit_workspace_task.delay(workspace_id, document_id)
         
         return {
             "workspace_id": workspace_id,
@@ -125,7 +138,7 @@ def resolve_workspace_task(self, workspace_id: int):
         raise self.retry(exc=exc, countdown=10)
 
 @celery_app.task(bind=True, max_retries=3, name="app.worker.tasks.audit_workspace_task")
-def audit_workspace_task(self, workspace_id: int):
+def audit_workspace_task(self, workspace_id: int, document_id: int = None):
     """
     Celery task to run the Consistency Swarm (Conflict Detection).
     """
@@ -147,6 +160,15 @@ def audit_workspace_task(self, workspace_id: int):
                 neo4j_client.driver = None
             
         conflicts = asyncio.run(_run_audit())
+        
+        if document_id:
+            async def _update_doc_complete():
+                async with AsyncSessionLocal() as db:
+                    await db.execute(
+                        Document.__table__.update().where(Document.id == document_id).values(current_stage="completed", status="completed")
+                    )
+                    await db.commit()
+            asyncio.run(_update_doc_complete())
         
         return {
             "workspace_id": workspace_id,
