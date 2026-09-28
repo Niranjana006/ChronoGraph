@@ -101,7 +101,7 @@ def resolve_workspace_task(self, workspace_id: int, document_id: int = None):
     logger.info(f"Task resolve_workspace_task received for workspace {workspace_id}")
     try:
         # Run resolution sequentially
-        async def _run_resolution():
+        async def _run_resolution_and_update():
             from app.graph.neo4j_client import neo4j_client
             await engine.dispose()
             if neo4j_client.driver is None:
@@ -109,21 +109,20 @@ def resolve_workspace_task(self, workspace_id: int, document_id: int = None):
             try:
                 m = await resolve_entities(workspace_id)
                 t = await resolve_temporal(workspace_id)
+                
+                if document_id:
+                    async with AsyncSessionLocal() as db:
+                        await db.execute(
+                            Document.__table__.update().where(Document.id == document_id).values(current_stage="auditing_conflicts")
+                        )
+                        await db.commit()
+                
                 return m, t
             finally:
                 await neo4j_client.close()
                 neo4j_client.driver = None
             
-        merged_pairs, temporal_processed = asyncio.run(_run_resolution())
-        
-        if document_id:
-            async def _update_doc_stage():
-                async with AsyncSessionLocal() as db:
-                    await db.execute(
-                        Document.__table__.update().where(Document.id == document_id).values(current_stage="auditing_conflicts")
-                    )
-                    await db.commit()
-            asyncio.run(_update_doc_stage())
+        merged_pairs, temporal_processed = asyncio.run(_run_resolution_and_update())
             
         # Auto-chain Consistency Swarm audit
         audit_workspace_task.delay(workspace_id, document_id)
@@ -147,28 +146,27 @@ def audit_workspace_task(self, workspace_id: int, document_id: int = None):
     
     logger.info(f"Task audit_workspace_task received for workspace {workspace_id}")
     try:
-        async def _run_audit():
+        async def _run_audit_and_update():
             from app.graph.neo4j_client import neo4j_client
             await engine.dispose()
             if neo4j_client.driver is None:
                 await neo4j_client.connect()
             try:
                 c = await audit_workspace(workspace_id)
+                
+                if document_id:
+                    async with AsyncSessionLocal() as db:
+                        await db.execute(
+                            Document.__table__.update().where(Document.id == document_id).values(current_stage="completed", status="completed")
+                        )
+                        await db.commit()
+                
                 return c
             finally:
                 await neo4j_client.close()
                 neo4j_client.driver = None
             
-        conflicts = asyncio.run(_run_audit())
-        
-        if document_id:
-            async def _update_doc_complete():
-                async with AsyncSessionLocal() as db:
-                    await db.execute(
-                        Document.__table__.update().where(Document.id == document_id).values(current_stage="completed", status="completed")
-                    )
-                    await db.commit()
-            asyncio.run(_update_doc_complete())
+        conflicts = asyncio.run(_run_audit_and_update())
         
         return {
             "workspace_id": workspace_id,

@@ -64,10 +64,10 @@ export function WorkspaceSidebar() {
       (c) => c.workspaceId === wsId && (c.status === "needs_review" || c.status === "escalated"),
     ).length;
 
-  const handleNewWorkspace = () => {
+  const handleNewWorkspace = async () => {
     const name = window.prompt("Workspace name");
     if (!name) return;
-    const ws = createWorkspace(name);
+    const ws = await createWorkspace(name);
     setLastWorkspaceId(ws.id);
     navigate({ to: "/workspace/$workspaceId", params: { workspaceId: ws.id } });
   };

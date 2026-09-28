@@ -54,8 +54,19 @@ async def upload_document(
     existing_doc = doc_result.scalar_one_or_none()
     
     if existing_doc:
-        # If it's already there, just return it. 
-        # (Could optionally check status and restart if failed)
+        if existing_doc.status == "failed":
+            existing_doc.status = "processing"
+            existing_doc.current_stage = "queued"
+            await db.commit()
+            await db.refresh(existing_doc)
+            
+            # Save file locally (for the worker to pick up)
+            file_path = os.path.join(UPLOAD_DIR, f"{file_hash}.pdf")
+            with open(file_path, "wb") as f:
+                f.write(content)
+                
+            from app.worker.tasks import process_document
+            process_document.delay(existing_doc.id, workspace_id, file_path)
         return existing_doc
         
     # 3. Save file locally (for the worker to pick up)

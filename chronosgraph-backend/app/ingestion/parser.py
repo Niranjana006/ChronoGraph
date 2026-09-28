@@ -53,11 +53,13 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[st
         chunks.append(text[start:end].strip())
         
         # Move start pointer forward, accounting for overlap
-        start = end - overlap
+        next_start = end - overlap
         
-        # Prevent infinite loops if overlap >= chunk size or no progress is made
-        if start <= chunks[-1].__len__() and len(chunks) > 1 and start == end - overlap:
+        # Prevent infinite loops if no progress is made
+        if next_start <= start:
             start = end
+        else:
+            start = next_start
             
     # Filter out empty chunks
     return [c for c in chunks if c]

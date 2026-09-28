@@ -43,10 +43,10 @@ function WorkspacePicker() {
       (c) => c.workspaceId === id && (c.status === "needs_review" || c.status === "escalated"),
     ).length;
 
-  const create = () => {
+  const create = async () => {
     const name = window.prompt("Workspace name");
     if (!name) return;
-    const ws = createWorkspace(name);
+    const ws = await createWorkspace(name);
     setLastWorkspaceId(ws.id);
     navigate({ to: "/workspace/$workspaceId", params: { workspaceId: ws.id } });
   };

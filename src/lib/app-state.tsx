@@ -30,7 +30,8 @@ interface AppState {
   lastWorkspaceId: string | null;
   setLastWorkspaceId: (id: string) => void;
   workspaces: Workspace[];
-  createWorkspace: (name: string) => Workspace;
+  fetchWorkspaces: () => Promise<void>;
+  createWorkspace: (name: string) => Promise<Workspace>;
   archiveWorkspace: (id: string) => void;
   chats: Chat[];
   createChat: (workspaceId: string) => Promise<Chat>;
@@ -48,7 +49,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [lastWorkspaceId, setLastWs] = useState<string | null>(null);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(mock.workspaces);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [chats, setChats] = useState<Chat[]>(mock.chats);
   const [conflicts, setConflicts] = useState<Conflict[]>(mock.conflicts);
 
@@ -138,7 +139,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const next = {
           ...prev,
           role,
-          workspaceIds: role === "pending" ? [] : mock.workspaces.map((w) => w.id),
+          workspaceIds: role === "pending" ? [] : workspaces.map((w) => w.id),
         };
         persist({ user: next, lastWorkspaceId });
         return next;
@@ -167,14 +168,41 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [hydrated, persist, user],
   );
 
-  const createWorkspace = useCallback((name: string) => {
+  const fetchWorkspaces = useCallback(async () => {
+    try {
+      if (!user) return;
+      const res = await apiFetch("/workspaces");
+      setWorkspaces(res.map((w: any) => ({
+        id: String(w.id),
+        name: w.name,
+        description: "Workspace",
+        documentCount: 0,
+        unresolvedConflicts: 0,
+        updatedAt: w.created_at,
+      })));
+    } catch (err) {
+      console.error("Failed to fetch workspaces", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && hydrated) {
+      fetchWorkspaces();
+    }
+  }, [user, hydrated, fetchWorkspaces]);
+
+  const createWorkspace = useCallback(async (name: string) => {
+    const res = await apiFetch("/workspaces", {
+      method: "POST",
+      body: JSON.stringify({ name, description: "New workspace" })
+    });
     const ws: Workspace = {
-      id: `ws-${Date.now()}`,
-      name,
+      id: String(res.id),
+      name: res.name,
       description: "New workspace — no documents ingested yet.",
       documentCount: 0,
       unresolvedConflicts: 0,
-      updatedAt: new Date().toISOString(),
+      updatedAt: res.created_at,
     };
     setWorkspaces((prev) => [...prev, ws]);
     return ws;
@@ -186,7 +214,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const createChat = useCallback(async (workspaceId: string) => {
     try {
-      const res = await apiFetch(`/workspaces/${workspaceId}/chats`, { method: "POST" });
+      const res = await apiFetch(`/workspaces/${workspaceId}/chats`, { 
+        method: "POST",
+        body: JSON.stringify({ title: "New chat" })
+      });
       const chat: Chat = {
         id: String(res.id),
         workspaceId,
@@ -254,6 +285,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       lastWorkspaceId,
       setLastWorkspaceId,
       workspaces,
+      fetchWorkspaces,
       createWorkspace,
       archiveWorkspace,
       chats,
@@ -276,6 +308,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       lastWorkspaceId,
       setLastWorkspaceId,
       workspaces,
+      fetchWorkspaces,
       createWorkspace,
       archiveWorkspace,
       chats,

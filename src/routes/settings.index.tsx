@@ -122,10 +122,10 @@ function AdminSettings() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => {
+            onClick={async () => {
               const name = window.prompt("Workspace name");
               if (name) {
-                createWorkspace(name);
+                await createWorkspace(name);
                 toast.success(`Workspace “${name}” created`);
               }
             }}

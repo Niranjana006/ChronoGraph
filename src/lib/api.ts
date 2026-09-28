@@ -23,7 +23,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
   
-  if (!(options.body instanceof URLSearchParams)) {
+  if (options.body && !(options.body instanceof URLSearchParams) && !(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -36,7 +36,11 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     let errorDetail = response.statusText;
     try {
       const errorData = await response.json();
-      errorDetail = errorData.detail || errorDetail;
+      if (errorData.detail) {
+        errorDetail = typeof errorData.detail === 'string' 
+          ? errorData.detail 
+          : JSON.stringify(errorData.detail);
+      }
     } catch {
       // Ignored
     }
