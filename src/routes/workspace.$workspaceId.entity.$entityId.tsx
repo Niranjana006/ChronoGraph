@@ -40,15 +40,60 @@ function overlaps(a: Fact, b: Fact) {
 }
 
 function EntityTimeline() {
-  const { entityId } = Route.useParams();
-  const entity = entities.find((e) => e.id === entityId);
+  const { workspaceId, entityId } = Route.useParams();
+  const [entity, setEntity] = useState<any>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    async function load() {
+      try {
+        const { getEntity } = await import("@/lib/api");
+        const data = await getEntity(workspaceId, entityId);
+        
+        // Format facts to match frontend expectations
+        const formattedFacts = data.facts.map((f: any) => {
+          let state = "valid";
+          if (f.valid_to && new Date(f.valid_to) < new Date()) {
+            state = "superseded";
+          }
+          // The API doesn't know about current unresolved conflicts in this endpoint yet, 
+          // so we'll just determine 'under_review' via overlaps below if we wanted, 
+          // but 'valid'/'superseded' is enough for basic styling.
+          
+          return {
+            id: f.id,
+            entityId: data.id,
+            statement: f.relation,
+            value: f.value || f.relation,
+            documentName: f.document_name || "Unknown",
+            snippet: f.evidence,
+            validFrom: f.valid_from,
+            validTo: f.valid_to,
+            extractedAt: new Date().toISOString(), // Fallback
+            state: state
+          };
+        });
+        
+        setEntity({
+          ...data,
+          facts: formattedFacts
+        });
+      } catch (err) {
+        console.error("Failed to fetch entity", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [workspaceId, entityId]);
+
+  if (loading) return <div className="p-10 text-sm text-muted-foreground">Loading entity timeline...</div>;
   if (!entity) return <div className="p-10 text-sm text-muted-foreground">Entity not found.</div>;
 
   const conflicting = new Set<string>();
-  entity.facts.forEach((a, i) =>
-    entity.facts.forEach((b, j) => {
+  entity.facts.forEach((a: Fact, i: number) =>
+    entity.facts.forEach((b: Fact, j: number) => {
       if (i < j && a.value !== b.value && overlaps(a, b)) {
         conflicting.add(a.id);
         conflicting.add(b.id);
@@ -56,7 +101,7 @@ function EntityTimeline() {
     }),
   );
 
-  const fact = entity.facts.find((f) => f.id === selected);
+  const fact = entity.facts.find((f: Fact) => f.id === selected);
   const years = [2022, 2023, 2024, 2025, 2026, 2027];
 
   return (

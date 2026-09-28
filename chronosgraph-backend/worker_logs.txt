@@ -1,0 +1,45 @@
+﻿2026-09-28 15:23:20,554 INFO sqlalchemy.engine.Engine SELECT documents.id, documents.workspace_id, documents.filename, documents.content_hash, documents.status, documents.current_stage, documents.created_at 
+FROM documents 
+WHERE documents.id = $1::INTEGER
+2026-09-28 15:23:20,554 INFO sqlalchemy.engine.Engine [cached since 114.1s ago] (56,)
+2026-09-28 15:23:20,559 INFO sqlalchemy.engine.Engine UPDATE documents SET current_stage=$1::VARCHAR WHERE documents.id = $2::INTEGER
+2026-09-28 15:23:20,559 INFO sqlalchemy.engine.Engine [cached since 114.1s ago] ('parsing', 56)
+2026-09-28 15:23:20,561 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-28 15:23:20,614 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-28 15:23:20,614 INFO sqlalchemy.engine.Engine UPDATE documents SET current_stage=$1::VARCHAR WHERE documents.id = $2::INTEGER
+2026-09-28 15:23:20,614 INFO sqlalchemy.engine.Engine [cached since 114.1s ago] ('extracting', 56)
+2026-09-28 15:23:20,616 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-28 15:23:22,510 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-28 15:23:22,511 INFO sqlalchemy.engine.Engine UPDATE documents SET current_stage=$1::VARCHAR WHERE documents.id = $2::INTEGER
+2026-09-28 15:23:22,511 INFO sqlalchemy.engine.Engine [cached since 116s ago] ('resolving_entities', 56)
+2026-09-28 15:23:22,513 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-28 15:23:36,419 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-28 15:23:36,421 INFO sqlalchemy.engine.Engine UPDATE documents SET current_stage=$1::VARCHAR WHERE documents.id = $2::INTEGER
+2026-09-28 15:23:36,421 INFO sqlalchemy.engine.Engine [generated in 0.00042s] ('auditing_conflicts', 56)
+2026-09-28 15:23:36,426 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-28 15:23:36,528 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-28 15:23:36,529 INFO sqlalchemy.engine.Engine UPDATE documents SET status=$1::VARCHAR, current_stage=$2::VARCHAR WHERE documents.id = $3::INTEGER
+2026-09-28 15:23:36,529 INFO sqlalchemy.engine.Engine [cached since 94.86s ago] ('completed', 'completed', 54)
+2026-09-28 15:23:36,534 INFO sqlalchemy.engine.Engine COMMIT
+ 
+ -------------- celery@ac6a68d3aadb v5.3.6 (emerald-rush)
+--- ***** ----- 
+-- ******* ---- Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.41 2026-09-28 15:33:43
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         chronosgraph_worker:0x7ef57717e010
+- ** ---------- .> transport:   redis://redis:6379/0
+- ** ---------- .> results:     redis://redis:6379/0
+- *** --- * --- .> concurrency: 1 (prefork)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . app.worker.celery_app.process_extraction
+  . app.worker.tasks.audit_workspace_task
+  . app.worker.tasks.process_document
+  . app.worker.tasks.resolve_workspace_task
+

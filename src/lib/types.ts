@@ -113,6 +113,8 @@ export interface Conflict {
   factBValidTo?: string;
   factADocumentName?: string;
   factBDocumentName?: string;
+  factAValue?: string;
+  factBValue?: string;
 }
 
 export interface AuditEntry {

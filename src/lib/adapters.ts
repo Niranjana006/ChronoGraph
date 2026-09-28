@@ -1,10 +1,12 @@
 import type { Conflict, IngestedDocument, Chat, ChatMessage, Citation } from "./types";
 
 export function adaptConflict(apiData: any): Conflict {
+  const getName = (val: any) => Array.isArray(val) ? val[0] : val;
+
   return {
     id: apiData.id,
     workspaceId: apiData.workspace_id || "", 
-    entityName: apiData.subject_name,
+    entityName: getName(apiData.subject_name),
     factAId: apiData.fact1_id,
     factBId: apiData.fact2_id,
     detectedAt: apiData.resolved_at || new Date().toISOString(), // Fallback if missing
@@ -20,6 +22,8 @@ export function adaptConflict(apiData: any): Conflict {
     factBValidTo: apiData.fact2_valid_to,
     factADocumentName: apiData.fact1_document_name,
     factBDocumentName: apiData.fact2_document_name,
+    factAValue: getName(apiData.fact1_value),
+    factBValue: getName(apiData.fact2_value),
   };
 }
 

@@ -49,3 +49,15 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
   return response.json();
 }
+
+export async function getConflicts(workspaceId: string) {
+  return apiFetch(`/workspaces/${workspaceId}/conflicts`);
+}
+
+export async function getConflict(workspaceId: string, conflictId: string) {
+  return apiFetch(`/workspaces/${workspaceId}/conflicts/${conflictId}`);
+}
+
+export async function getEntity(workspaceId: string, entityId: string) {
+  return apiFetch(`/workspaces/${workspaceId}/entities/${encodeURIComponent(entityId)}`);
+}

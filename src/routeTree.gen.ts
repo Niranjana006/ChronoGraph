@@ -18,7 +18,6 @@ import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as WorkspaceWorkspaceIdRouteImport } from './routes/workspace.$workspaceId'
 import { Route as WorkspaceWorkspaceIdIndexRouteImport } from './routes/workspace.$workspaceId.index'
 import { Route as WorkspaceWorkspaceIdAuditLogRouteImport } from './routes/workspace.$workspaceId.audit-log'
-import { Route as WorkspaceWorkspaceIdGraphRouteImport } from './routes/workspace.$workspaceId.graph'
 import { Route as WorkspaceWorkspaceIdIngestionRouteImport } from './routes/workspace.$workspaceId.ingestion'
 import { Route as WorkspaceWorkspaceIdChatChatIdRouteImport } from './routes/workspace.$workspaceId.chat.$chatId'
 import { Route as WorkspaceWorkspaceIdConflictsIndexRouteImport } from './routes/workspace.$workspaceId.conflicts.index'
@@ -72,12 +71,6 @@ const WorkspaceWorkspaceIdAuditLogRoute =
     path: '/audit-log',
     getParentRoute: () => WorkspaceWorkspaceIdRoute,
   } as any)
-const WorkspaceWorkspaceIdGraphRoute =
-  WorkspaceWorkspaceIdGraphRouteImport.update({
-    id: '/graph',
-    path: '/graph',
-    getParentRoute: () => WorkspaceWorkspaceIdRoute,
-  } as any)
 const WorkspaceWorkspaceIdIngestionRoute =
   WorkspaceWorkspaceIdIngestionRouteImport.update({
     id: '/ingestion',
@@ -118,7 +111,6 @@ export interface FileRoutesByFullPath {
   '/workspace/$workspaceId': typeof WorkspaceWorkspaceIdRouteWithChildren
   '/settings/': typeof SettingsIndexRoute
   '/workspace/$workspaceId/audit-log': typeof WorkspaceWorkspaceIdAuditLogRoute
-  '/workspace/$workspaceId/graph': typeof WorkspaceWorkspaceIdGraphRoute
   '/workspace/$workspaceId/ingestion': typeof WorkspaceWorkspaceIdIngestionRoute
   '/workspace/$workspaceId/': typeof WorkspaceWorkspaceIdIndexRoute
   '/workspace/$workspaceId/chat/$chatId': typeof WorkspaceWorkspaceIdChatChatIdRoute
@@ -133,7 +125,6 @@ export interface FileRoutesByTo {
   '/settings/profile': typeof SettingsProfileRoute
   '/settings': typeof SettingsIndexRoute
   '/workspace/$workspaceId/audit-log': typeof WorkspaceWorkspaceIdAuditLogRoute
-  '/workspace/$workspaceId/graph': typeof WorkspaceWorkspaceIdGraphRoute
   '/workspace/$workspaceId/ingestion': typeof WorkspaceWorkspaceIdIngestionRoute
   '/workspace/$workspaceId': typeof WorkspaceWorkspaceIdIndexRoute
   '/workspace/$workspaceId/chat/$chatId': typeof WorkspaceWorkspaceIdChatChatIdRoute
@@ -151,7 +142,6 @@ export interface FileRoutesById {
   '/workspace/$workspaceId': typeof WorkspaceWorkspaceIdRouteWithChildren
   '/settings/': typeof SettingsIndexRoute
   '/workspace/$workspaceId/audit-log': typeof WorkspaceWorkspaceIdAuditLogRoute
-  '/workspace/$workspaceId/graph': typeof WorkspaceWorkspaceIdGraphRoute
   '/workspace/$workspaceId/ingestion': typeof WorkspaceWorkspaceIdIngestionRoute
   '/workspace/$workspaceId/': typeof WorkspaceWorkspaceIdIndexRoute
   '/workspace/$workspaceId/chat/$chatId': typeof WorkspaceWorkspaceIdChatChatIdRoute
@@ -170,7 +160,6 @@ export interface FileRouteTypes {
     | '/workspace/$workspaceId'
     | '/settings/'
     | '/workspace/$workspaceId/audit-log'
-    | '/workspace/$workspaceId/graph'
     | '/workspace/$workspaceId/ingestion'
     | '/workspace/$workspaceId/'
     | '/workspace/$workspaceId/chat/$chatId'
@@ -185,7 +174,6 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/settings'
     | '/workspace/$workspaceId/audit-log'
-    | '/workspace/$workspaceId/graph'
     | '/workspace/$workspaceId/ingestion'
     | '/workspace/$workspaceId'
     | '/workspace/$workspaceId/chat/$chatId'
@@ -202,7 +190,6 @@ export interface FileRouteTypes {
     | '/workspace/$workspaceId'
     | '/settings/'
     | '/workspace/$workspaceId/audit-log'
-    | '/workspace/$workspaceId/graph'
     | '/workspace/$workspaceId/ingestion'
     | '/workspace/$workspaceId/'
     | '/workspace/$workspaceId/chat/$chatId'
@@ -284,13 +271,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkspaceWorkspaceIdAuditLogRouteImport
       parentRoute: typeof WorkspaceWorkspaceIdRoute
     }
-    '/workspace/$workspaceId/graph': {
-      id: '/workspace/$workspaceId/graph'
-      path: '/graph'
-      fullPath: '/workspace/$workspaceId/graph'
-      preLoaderRoute: typeof WorkspaceWorkspaceIdGraphRouteImport
-      parentRoute: typeof WorkspaceWorkspaceIdRoute
-    }
     '/workspace/$workspaceId/ingestion': {
       id: '/workspace/$workspaceId/ingestion'
       path: '/ingestion'
@@ -345,7 +325,6 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 interface WorkspaceWorkspaceIdRouteChildren {
   WorkspaceWorkspaceIdAuditLogRoute: typeof WorkspaceWorkspaceIdAuditLogRoute
-  WorkspaceWorkspaceIdGraphRoute: typeof WorkspaceWorkspaceIdGraphRoute
   WorkspaceWorkspaceIdIngestionRoute: typeof WorkspaceWorkspaceIdIngestionRoute
   WorkspaceWorkspaceIdIndexRoute: typeof WorkspaceWorkspaceIdIndexRoute
   WorkspaceWorkspaceIdChatChatIdRoute: typeof WorkspaceWorkspaceIdChatChatIdRoute
@@ -356,7 +335,6 @@ interface WorkspaceWorkspaceIdRouteChildren {
 
 const WorkspaceWorkspaceIdRouteChildren: WorkspaceWorkspaceIdRouteChildren = {
   WorkspaceWorkspaceIdAuditLogRoute: WorkspaceWorkspaceIdAuditLogRoute,
-  WorkspaceWorkspaceIdGraphRoute: WorkspaceWorkspaceIdGraphRoute,
   WorkspaceWorkspaceIdIngestionRoute: WorkspaceWorkspaceIdIngestionRoute,
   WorkspaceWorkspaceIdIndexRoute: WorkspaceWorkspaceIdIndexRoute,
   WorkspaceWorkspaceIdChatChatIdRoute: WorkspaceWorkspaceIdChatChatIdRoute,

@@ -124,7 +124,7 @@ function ConflictQueue() {
         {list.map((c) => {
           const a: FactInfo = {
             id: c.factAId,
-            value: `${c.entityName} ${c.factADocumentName ? "->" : ""} ...`, // backend payload lacks full relation string, simplify for now
+            value: c.factAValue || `${c.entityName} ${c.factADocumentName ? "->" : ""} ...`,
             snippet: c.factAEvidence || "No evidence available",
             documentName: c.factADocumentName || "Unknown",
             validFrom: c.factAValidFrom || "unknown",
@@ -132,7 +132,7 @@ function ConflictQueue() {
           };
           const b: FactInfo = {
             id: c.factBId,
-            value: `${c.entityName} ${c.factBDocumentName ? "->" : ""} ...`,
+            value: c.factBValue || `${c.entityName} ${c.factBDocumentName ? "->" : ""} ...`,
             snippet: c.factBEvidence || "No evidence available",
             documentName: c.factBDocumentName || "Unknown",
             validFrom: c.factBValidFrom || "unknown",

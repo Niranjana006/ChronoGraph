@@ -57,7 +57,7 @@ from app.ingestion.router import router as ingestion_router
 from app.resolution.router import router as resolution_router
 from app.conflicts.router import router as conflicts_router
 from app.chat.router import router as chat_router
-from app.graph.router import router as graph_router
+from app.entities.router import router as entities_router
 
 app.include_router(auth_router)
 app.include_router(workspaces_router)
@@ -65,7 +65,7 @@ app.include_router(ingestion_router)
 app.include_router(resolution_router)
 app.include_router(conflicts_router)
 app.include_router(chat_router)
-app.include_router(graph_router)
+app.include_router(entities_router)
 
 @app.get("/health")
 async def health_check():
