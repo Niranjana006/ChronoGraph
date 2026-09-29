@@ -101,31 +101,36 @@ async def main():
     results_chronos = []
 
     print(f"Running evaluation on {len(BENCHMARK_DATASET)} synthetic test cases...")
-    for item in BENCHMARK_DATASET:
+    for i, item in enumerate(BENCHMARK_DATASET):
         print(f"\n--- Testing Case: {item['id']} ({item['domain']}) ---")
         query = item["query"]
         doc1 = item["doc1"]
         doc2 = item["doc2"]
         gt = item["ground_truth"]
         
-        print("Running Baseline RAG...")
-        baseline_ans = await run_baseline_rag(query, doc1, doc2)
-        print("Baseline Answer:", baseline_ans)
-        
-        print("Running ChronosGraph RAG...")
-        chronos_ans = await run_chronos_rag(query, doc1, doc2)
-        print("Chronos Answer:", chronos_ans)
-        
-        # Calculate Metrics
-        print("Calculating RAGAS metrics for Baseline...")
-        b_faith = await score_faithfulness(query, baseline_ans, [doc1, doc2])
-        b_rel = await score_answer_relevancy(query, baseline_ans)
-        b_ca = await score_contradiction_awareness(query, baseline_ans, gt)
-        
-        print("Calculating RAGAS metrics for ChronosGraph...")
-        c_faith = await score_faithfulness(query, chronos_ans, [doc1, doc2])
-        c_rel = await score_answer_relevancy(query, chronos_ans)
-        c_ca = await score_contradiction_awareness(query, chronos_ans, gt)
+        try:
+            print("Running Baseline RAG...")
+            baseline_ans = await run_baseline_rag(query, doc1, doc2)
+            print("Baseline Answer:", baseline_ans)
+            
+            print("Running ChronosGraph RAG...")
+            chronos_ans = await run_chronos_rag(query, doc1, doc2)
+            print("Chronos Answer:", chronos_ans)
+            
+            # Calculate Metrics
+            print("Calculating RAGAS metrics for Baseline...")
+            b_faith = await score_faithfulness(query, baseline_ans, [doc1, doc2])
+            b_rel = await score_answer_relevancy(query, baseline_ans)
+            b_ca = await score_contradiction_awareness(query, baseline_ans, gt)
+            
+            print("Calculating RAGAS metrics for ChronosGraph...")
+            c_faith = await score_faithfulness(query, chronos_ans, [doc1, doc2])
+            c_rel = await score_answer_relevancy(query, chronos_ans)
+            c_ca = await score_contradiction_awareness(query, chronos_ans, gt)
+        except Exception as e:
+            print(f"Error during evaluation of case {item['id']}: {e}")
+            print("Stopping evaluation due to error (e.g. rate limit). Saving progress...")
+            break
 
         results_baseline.append({
             "faithfulness": b_faith,
@@ -138,41 +143,40 @@ async def main():
             "answer_relevancy": c_rel,
             "contradiction_awareness": c_ca
         })
+        
+        # Incremental Save
+        df_baseline = pd.DataFrame(results_baseline)
+        df_chronos = pd.DataFrame(results_chronos)
+        summary = {
+            "Metric": ["Faithfulness", "Answer Relevancy", "Contradiction Awareness"],
+            "Baseline (Query-Time Only)": [
+                df_baseline["faithfulness"].mean(),
+                df_baseline["answer_relevancy"].mean(),
+                df_baseline["contradiction_awareness"].mean()
+            ],
+            "ChronosGraph (Scoped Auditing)": [
+                df_chronos["faithfulness"].mean(),
+                df_chronos["answer_relevancy"].mean(),
+                df_chronos["contradiction_awareness"].mean()
+            ]
+        }
+        summary_df = pd.DataFrame(summary)
+        with open("evaluation_results.md", "w") as f:
+            f.write(f"# Phase 7 Evaluation: Detection-Coverage Comparison (Completed {i+1}/{len(BENCHMARK_DATASET)})\n\n")
+            cols = summary_df.columns.tolist()
+            f.write("| " + " | ".join(cols) + " |\n")
+            f.write("|" + "|".join(["---"] * len(cols)) + "|\n")
+            for _, row in summary_df.iterrows():
+                f.write("| " + " | ".join(str(x) for x in row.values) + " |\n")
 
-    # Generate summary report
-    df_baseline = pd.DataFrame(results_baseline)
-    df_chronos = pd.DataFrame(results_chronos)
-    
-    summary = {
-        "Metric": ["Faithfulness", "Answer Relevancy", "Contradiction Awareness"],
-        "Baseline (Query-Time Only)": [
-            df_baseline["faithfulness"].mean(),
-            df_baseline["answer_relevancy"].mean(),
-            df_baseline["contradiction_awareness"].mean()
-        ],
-        "ChronosGraph (Scoped Auditing)": [
-            df_chronos["faithfulness"].mean(),
-            df_chronos["answer_relevancy"].mean(),
-            df_chronos["contradiction_awareness"].mean()
-        ]
-    }
-    
-    summary_df = pd.DataFrame(summary)
     print("\n" + "="*50)
     print("EVALUATION RESULTS")
     print("="*50)
-    print(summary_df.to_string(index=False))
-    
-    # Save to file
-    with open("evaluation_results.md", "w") as f:
-        f.write("# Phase 7 Evaluation: Detection-Coverage Comparison\n\n")
-        cols = summary_df.columns.tolist()
-        f.write("| " + " | ".join(cols) + " |\n")
-        f.write("|" + "|".join(["---"] * len(cols)) + "|\n")
-        for _, row in summary_df.iterrows():
-            f.write("| " + " | ".join(str(x) for x in row.values) + " |\n")
-        
-    print("\nResults written to evaluation_results.md")
+    if 'summary_df' in locals():
+        print(summary_df.to_string(index=False))
+        print(f"\nResults written to evaluation_results.md ({len(results_baseline)} cases evaluated)")
+    else:
+        print("No cases completed.")
 
 if __name__ == "__main__":
     asyncio.run(main())
