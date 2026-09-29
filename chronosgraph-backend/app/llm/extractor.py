@@ -32,6 +32,7 @@ Extract all relevant entities. Then, extract the relationships (facts) between t
 Crucially, look for temporal bounds. If a fact is only true during a specific time, capture it in `valid_from` and `valid_to`.
 
 CRITICAL INSTRUCTION: DO NOT extract pronouns (e.g., "He", "She", "It", "They", "This", "That") as entities. Only extract concrete named entities (e.g., "John F. Kennedy", "Apple", "United States"). Resolve pronouns to their referents if possible, otherwise ignore them.
+CRITICAL INSTRUCTION: Every 'source' and 'target' in your facts MUST exactly match an 'id' defined in the 'entities' list. If you want to use a number, amount, date, or concept as a target, you MUST define it as an entity in the 'entities' array first.
 
 Schema Requirement:
 {
@@ -74,7 +75,14 @@ async def extract_graph_from_chunk(text_chunk: str) -> ExtractionSchema:
     
     try:
         # Pydantic will validate the structure
-        parsed_data = json.loads(response_json_str)
+        cleaned = response_json_str.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        parsed_data = json.loads(cleaned.strip())
         extraction = ExtractionSchema(**parsed_data)
         
         # 2nd line of defense: filter out pronoun entities

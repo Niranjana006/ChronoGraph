@@ -71,7 +71,7 @@ async def resolve_entities(workspace_id: int):
                 MATCH (eb:Entity {id: $name_b, workspace_id: $workspace_id})
                 // Use apoc to merge eb into ea
                 CALL apoc.refactor.mergeNodes([ea, eb], {
-                    properties: "combine",
+                    properties: "overwrite",
                     mergeRels: true
                 }) YIELD node
                 RETURN node

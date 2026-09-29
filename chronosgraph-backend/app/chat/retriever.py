@@ -12,9 +12,10 @@ from app.resolution.entities import get_embedder
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are a query analysis AI for a Knowledge Graph.
-Extract the core entities from the user's question. These are typically proper nouns, companies, people, or locations.
+Extract the core entities and key concepts from the user's question. 
+These include proper nouns, companies, people, locations, and important subjects (e.g., 'budget', 'Q3 marketing', 'server logs', 'headquarters').
 Return a JSON object containing an array of strings called 'entities'.
-If no clear entities are present, return an empty array.
+If no clear entities or concepts are present, return an empty array.
 """
 
 @retry(
@@ -29,7 +30,18 @@ async def extract_query_entities(query: str) -> list[str]:
         user_prompt=prompt,
         response_format={"type": "json_object"}
     )
-    data = json.loads(response_json)
+    cleaned = response_json.strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+    if cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    try:
+        data = json.loads(cleaned.strip())
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse query entities: {e}. Raw: {response_json}")
+        data = {}
     return data.get("entities", [])
 
 async def retrieve_context(workspace_id: int, query: str):
@@ -48,7 +60,7 @@ async def retrieve_context(workspace_id: int, query: str):
     # 2. Vector match against workspace entities
     query_fetch = """
     MATCH (e:Entity {workspace_id: $workspace_id})
-    RETURN e.id AS name
+    RETURN e.id AS id, e.name AS name
     """
     async with neo4j_client.driver.session() as session:
         result = await session.run(query_fetch, workspace_id=workspace_id)
@@ -57,7 +69,12 @@ async def retrieve_context(workspace_id: int, query: str):
     if not records:
         return []
         
-    workspace_entity_names = [record["name"] for record in records]
+    workspace_entity_names = []
+    for record in records:
+        name = record["name"]
+        if isinstance(name, list):
+            name = name[0] if name else ""
+        workspace_entity_names.append(name)
     
     # Embed both as tensors for sentence_transformers.util.cos_sim
     emb = get_embedder()
@@ -66,17 +83,19 @@ async def retrieve_context(workspace_id: int, query: str):
     
     sim_matrix = util.cos_sim(query_embs, workspace_embs)
     
-    matched_entity_names = set()
+    matched_entity_ids = []
     for i in range(len(query_entities)):
         for j in range(len(workspace_entity_names)):
             if sim_matrix[i][j].item() >= 0.70: # Threshold for matching query entity to graph entity
-                matched_entity_names.add(workspace_entity_names[j])
+                entity_id = records[j]["id"]
+                if entity_id not in matched_entity_ids:
+                    matched_entity_ids.append(entity_id)
                 
-    if not matched_entity_names:
+    if not matched_entity_ids:
         logger.info("No matching entities found in the graph.")
         return []
         
-    logger.info(f"Matched graph entities: {matched_entity_names}")
+    logger.info(f"Matched graph entities: {matched_entity_ids}")
     
     # 3. Cypher Traversal for 1-hop facts and conflicts
     # We want to pull any Fact connected to these matched entities, 
@@ -85,8 +104,7 @@ async def retrieve_context(workspace_id: int, query: str):
     MATCH (e:Entity {workspace_id: $workspace_id})
     WHERE e.id IN $matched_names
     MATCH (e)-[r]-(f:Fact {workspace_id: $workspace_id})
-    // Get the other entity involved in this fact
-    MATCH (f)-[r2]-(e2:Entity)
+    OPTIONAL MATCH (f)-[r2]-(e2:Entity)
     WHERE e2.id <> e.id
     OPTIONAL MATCH (f)-[:SOURCED_FROM]->(d:Document)
     OPTIONAL MATCH (f)-[c:CONTRADICTS]-(f2:Fact {workspace_id: $workspace_id})
@@ -107,7 +125,7 @@ async def retrieve_context(workspace_id: int, query: str):
     """
     
     async with neo4j_client.driver.session() as session:
-        result = await session.run(traversal_query, workspace_id=workspace_id, matched_names=list(matched_entity_names))
+        result = await session.run(traversal_query, workspace_id=workspace_id, matched_names=list(matched_entity_ids))
         retrieved_data = await result.data()
         
     return retrieved_data
