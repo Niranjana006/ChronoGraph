@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import * as mock from "./mock-data";
-import { apiFetch, setToken, clearToken } from "./api";
+import { apiFetch, setToken, clearToken, getToken } from "./api";
 import type { Chat, ChatMessage, Conflict, Role, User, Workspace } from "./types";
 
 const STORAGE_KEY = "chronosgraph.session.v1";
@@ -54,17 +54,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [conflicts, setConflicts] = useState<Conflict[]>(mock.conflicts);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Session;
-        setUser(parsed.user ?? null);
-        setLastWs(parsed.lastWorkspaceId ?? null);
+    async function hydrateUser() {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Session;
+          setLastWs(parsed.lastWorkspaceId ?? null);
+        }
+        if (getToken()) {
+          const me = await apiFetch("/auth/me");
+          const account: User = {
+            id: String(me.id),
+            name: me.name,
+            email: me.email,
+            role: (me.role as Role) || "analyst",
+            workspaceIds: [],
+            createdAt: me.created_at,
+          };
+          setUser(account);
+        }
+      } catch {
+        clearToken();
+        setUser(null);
+      } finally {
+        setHydrated(true);
       }
-    } catch {
-      /* ignore */
     }
-    setHydrated(true);
+    hydrateUser();
   }, []);
 
   const persist = useCallback((next: Session) => {
@@ -89,14 +105,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         
         setToken(res.access_token);
         
-        // Mock user details since /auth/login only returns token for now
+        // Fetch real user details and role from backend /auth/me
+        const me = await apiFetch("/auth/me");
         const account: User = {
-          id: `u-${Date.now()}`,
-          name: email.split("@")[0],
-          email,
-          role: "analyst",
+          id: String(me.id),
+          name: me.name,
+          email: me.email,
+          role: (me.role as Role) || "analyst",
           workspaceIds: [],
-          createdAt: new Date().toISOString(),
+          createdAt: me.created_at,
         };
         setUser(account);
         persist({ user: account, lastWorkspaceId });
@@ -111,7 +128,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const signup: AppState["signup"] = useCallback(
     async (name, email, password = "") => {
       try {
-        const res = await apiFetch("/auth/signup", {
+        await apiFetch("/auth/signup", {
           method: "POST",
           body: JSON.stringify({ name, email, password }),
         });
@@ -134,18 +151,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const setRole = useCallback(
     (role: Role) => {
-      setUser((prev) => {
-        if (!prev) return prev;
-        const next = {
-          ...prev,
-          role,
-          workspaceIds: role === "pending" ? [] : workspaces.map((w) => w.id),
-        };
-        persist({ user: next, lastWorkspaceId });
-        return next;
-      });
+      // Role is read from real backend authentication/profile; manual override disabled.
+      console.warn("Manual role override is disabled. Role is assigned by backend.");
     },
-    [lastWorkspaceId, persist],
+    [],
   );
 
   const updateUser = useCallback(
@@ -172,14 +181,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     try {
       if (!user) return;
       const res = await apiFetch("/workspaces");
-      setWorkspaces(res.map((w: any) => ({
-        id: String(w.id),
-        name: w.name,
-        description: "Workspace",
-        documentCount: 0,
-        unresolvedConflicts: 0,
-        updatedAt: w.created_at,
-      })));
+      const list = await Promise.all(
+        res.map(async (w: any) => {
+          let count = 0;
+          try {
+            const docs = await apiFetch(`/workspaces/${w.id}/documents`);
+            count = docs.length;
+          } catch {
+            /* ignore fallback */
+          }
+          return {
+            id: String(w.id),
+            name: w.name,
+            description: "Workspace",
+            documentCount: count,
+            unresolvedConflicts: 0,
+            updatedAt: w.created_at,
+          };
+        }),
+      );
+      setWorkspaces(list);
     } catch (err) {
       console.error("Failed to fetch workspaces", err);
     }

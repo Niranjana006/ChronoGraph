@@ -28,6 +28,7 @@ export interface ChatMessage {
   createdAt: string;
   citations?: Citation[];
   conflicts?: { status: string; explanation: string }[];
+  conflictRefs?: string[];
 }
 
 export interface Chat {
@@ -67,6 +68,9 @@ export interface IngestedDocument {
   current_stage?: string;
   uploadedAt: string;
   errorReason?: string;
+  newFacts?: number;
+  updatedFacts?: number;
+  auditedNodes?: number;
 }
 
 export interface Fact {

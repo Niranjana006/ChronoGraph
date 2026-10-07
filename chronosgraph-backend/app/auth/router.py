@@ -9,7 +9,13 @@ from app.auth.models import User
 from app.auth.schemas import UserCreate, UserResponse, Token, UserLogin
 from app.auth.jwt_handler import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
+from app.auth.dependencies import get_current_user
+
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def signup(user_data: UserCreate, db: AsyncSession = Depends(get_db)):

@@ -72,8 +72,8 @@ export function WorkspaceSidebar() {
     navigate({ to: "/workspace/$workspaceId", params: { workspaceId: ws.id } });
   };
 
-  const handleNewChat = (workspaceId: string) => {
-    const chat = createChat(workspaceId);
+  const handleNewChat = async (workspaceId: string) => {
+    const chat = await createChat(workspaceId);
     navigate({
       to: "/workspace/$workspaceId/chat/$chatId",
       params: { workspaceId, chatId: chat.id },

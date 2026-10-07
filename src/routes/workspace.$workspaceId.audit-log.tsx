@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NoAccess } from "./workspace.$workspaceId.conflicts.index";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,7 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp } from "@/lib/app-state";
-import { auditEntries } from "@/lib/mock-data";
+import { apiFetch } from "@/lib/api";
+import type { AuditEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/workspace/$workspaceId/audit-log")({
@@ -34,15 +35,40 @@ export const Route = createFileRoute("/workspace/$workspaceId/audit-log")({
 function AuditLog() {
   const { workspaceId } = Route.useParams();
   const { role, workspaces } = useApp();
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [resolution, setResolution] = useState("all");
   const [scope, setScope] = useState(workspaceId);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const targetWs = scope === "all" ? workspaceId : scope;
+    apiFetch(`/workspaces/${targetWs}/audit-log`)
+      .then((data) => {
+        if (!cancelled) {
+          setEntries(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load audit log entries", err);
+        if (!cancelled) {
+          setEntries([]);
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, scope]);
+
   const rows = useMemo(
     () =>
-      auditEntries.filter((e) => {
+      entries.filter((e) => {
         if (scope !== "all" && e.workspaceId !== scope) return false;
         if (resolution !== "all" && e.resolution !== resolution) return false;
         if (from && new Date(e.timestamp) < new Date(from)) return false;
@@ -55,7 +81,7 @@ function AuditLog() {
           e.resolvedBy.toLowerCase().includes(needle)
         );
       }),
-    [q, resolution, scope, from, to],
+    [entries, q, resolution, scope, from, to],
   );
 
   if (role === "analyst") return <NoAccess />;

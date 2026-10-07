@@ -54,7 +54,7 @@ async def upload_document(
     existing_doc = doc_result.scalar_one_or_none()
     
     if existing_doc:
-        if existing_doc.status == "failed":
+        if existing_doc.status != "complete":
             existing_doc.status = "processing"
             existing_doc.current_stage = "queued"
             await db.commit()

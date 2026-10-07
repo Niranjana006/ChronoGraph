@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = (import.meta.env["VITE_API_URL"] as string) || "http://localhost:8000";
 
 export function getToken() {
   return localStorage.getItem("token");
@@ -15,8 +15,8 @@ export function clearToken() {
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const token = getToken();
   
-  const headers: HeadersInit = {
-    ...options.headers,
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
   };
   
   if (token) {

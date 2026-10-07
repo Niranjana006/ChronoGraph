@@ -174,10 +174,10 @@ function IngestionPage() {
                     title={d.errorReason}
                     className={cn(
                       "inline-block rounded-full px-2 py-0.5 text-[11px] font-medium",
-                      statusClass(d.status),
+                      statusClass(d.status as DocStatus),
                     )}
                   >
-                    {STATUS_LABEL[d.status]}
+                    {(STATUS_LABEL as Record<string, string>)[d.status] || d.status}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">

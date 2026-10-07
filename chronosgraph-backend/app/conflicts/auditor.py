@@ -67,8 +67,8 @@ async def audit_workspace(workspace_id: int):
           (s1.id = s2.id AND o1.id <> o2.id) OR
           (o1.id = o2.id AND s1.id <> s2.id)
       )
-      AND f1.temporal_confidence <> 'low'
-      AND f2.temporal_confidence <> 'low'
+      AND coalesce(f1.temporal_confidence, 'high') <> 'low'
+      AND coalesce(f2.temporal_confidence, 'high') <> 'low'
       // Temporal overlap check (null valid_to means valid until present)
       AND coalesce(f1.parsed_valid_from, date('1000-01-01')) <= coalesce(f2.parsed_valid_to, date())
       AND coalesce(f2.parsed_valid_from, date('1000-01-01')) <= coalesce(f1.parsed_valid_to, date())

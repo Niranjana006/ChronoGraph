@@ -1,15 +1,7 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { ClipboardList, FileUp, MessagesSquare, ScrollText, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { canAdmin, canSteward, useApp } from "@/lib/app-state";
-import type { Role } from "@/lib/types";
+import { canAdmin, canSteward, roleLabel, useApp } from "@/lib/app-state";
 import { cn } from "@/lib/utils";
 
 const linkClass =
@@ -18,7 +10,7 @@ const activeClass = "bg-accent text-foreground";
 
 export function WorkspaceTopNav() {
   const { workspaceId } = useParams({ strict: false }) as { workspaceId?: string };
-  const { role, setRole, workspaces, conflicts } = useApp();
+  const { role, user, workspaces, conflicts } = useApp();
   const ws = workspaces.find((w) => w.id === workspaceId);
   const open = conflicts.filter(
     (c) => c.workspaceId === workspaceId && (c.status === "needs_review" || c.status === "escalated"),
@@ -85,17 +77,9 @@ export function WorkspaceTopNav() {
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
-        <span className="text-[11px] text-muted-foreground">Demo role</span>
-        <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-          <SelectTrigger className="h-8 w-[128px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="analyst">Analyst</SelectItem>
-            <SelectItem value="steward">Steward</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-          </SelectContent>
-        </Select>
+        <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+          {user?.role ? roleLabel[user.role] ?? user.role : "Role"}
+        </span>
         <ThemeToggle />
       </div>
     </header>

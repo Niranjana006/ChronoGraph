@@ -28,8 +28,8 @@ def hash_prompt(system: str, user: str) -> str:
     return hashlib.sha256(content).hexdigest()
 
 @retry(
-    wait=wait_exponential(multiplier=1, min=2, max=60),
-    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=2, max=60),
+    stop=stop_after_attempt(10),
     retry=retry_if_exception_type(RateLimitError),
     before_sleep=lambda retry_state: logger.warning(f"Rate limited. Retrying attempt {retry_state.attempt_number}...")
 )
@@ -49,7 +49,7 @@ async def generate_completion(system_prompt: str, user_prompt: str, response_for
     
         # 2. Throttle
         # Prevent burst spikes by sleeping a small amount before the actual outgoing request
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(2.0)
     
         # 3. Call LLM
         logger.info(f"Calling LLM ({settings.llm_provider} - {settings.llm_model})")

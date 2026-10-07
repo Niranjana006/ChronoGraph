@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { entities } from "@/lib/mock-data";
 import type { Fact } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -120,7 +120,7 @@ function EntityTimeline() {
         </div>
 
         <div className="relative mt-4 space-y-3">
-          {entity.facts.map((f) => {
+          {entity.facts.map((f: Fact) => {
             const left = pct(f.validFrom, 0);
             const right = pct(f.validTo, 100);
             const isConflict = conflicting.has(f.id);

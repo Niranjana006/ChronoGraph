@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { useApp } from "@/lib/app-state";
 import { apiFetch } from "@/lib/api";
 import { entities, graphFor } from "@/lib/mock-data";
-import type { GraphNode } from "@/lib/types";
+import type { GraphNode, GraphEdge } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/workspace/$workspaceId/conflicts/$conflictId")({
